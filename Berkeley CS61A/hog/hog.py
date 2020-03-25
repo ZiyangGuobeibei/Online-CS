@@ -151,13 +151,15 @@ def play(strategy0, strategy1, score0=0, score1=0, dice=six_sided,
                 score1 += result
                 if is_swap(score1, score0):
                     score1, score0 = score0, score1
-            else:
-                result = take_turn(strategy0(score0, score1), score1, dice)
-                score0 += result
+                else:
+                    result = take_turn(strategy0(score0, score1), score1, dice)
+                    score0 += result
                 if is_swap(score1, score0):
                     score1, score0 = score0, score1
+            say = say(score0, score1)
             player = 1 - player
     else:
+
         prev0, prev1 = 0, 0
         while (score0 < goal and score1 < goal):
             if player:
@@ -176,6 +178,7 @@ def play(strategy0, strategy1, score0=0, score1=0, dice=six_sided,
                 if is_swap(score0, score1):
                     score1,score0 = score0,score1
                 prev0 = num_rolls
+            say = say(score0, score1)
             player = 1 - player
 
     # END PROBLEM 5
@@ -215,6 +218,7 @@ def announce_lead_changes(previous_leader=None):
         elif score1 > score0:
             leader = 1
         else:
+            leader = None
             leader = None
         if leader != None and leader != previous_leader:
             print('Player', leader, 'takes the lead by', abs(score0 - score1))
@@ -268,6 +272,26 @@ def announce_highest(who, previous_high=0, previous_score=0):
     assert who == 0 or who == 1, 'The who argument should indicate a player.'
     # BEGIN PROBLEM 7
     "*** YOUR CODE HERE ***"
+    if who == 0:
+        def say(score0, score1):
+            previous_highest = previous_high
+            previous = previous_score
+            change = score0 - previous_score
+            if change > previous_high:
+                print("{} point(s)! That's the biggest gain yet for Player 0".format(change))
+                previous_highest = change
+            previous = score0
+            return announce_highest(who, previous_highest, previous)
+    else:
+        def say(score0, score1):
+            previous_highest, previous = previous_high, previous_score
+            change = score1 - previous_score
+            if change > previous_high:
+                print("{} point(s)! That's the biggest gain yet for Player 1".format(change))
+                previous_highest = change
+            previous = score1
+            return announce_highest(who, previous_highest, previous)
+    return say
     # END PROBLEM 7
 
 
@@ -394,24 +418,3 @@ def final_strategy(score, opponent_score):
 
 ##########################
 # Command Line Interface #
-##########################
-
-# NOTE: Functions in this section do not need to be changed. They use features
-# of Python not yet covered in the course.
-
-
-@main
-def run(*args):
-    """Read in the command-line argument and calls corresponding functions.
-
-    This function uses Python syntax/techniques not yet covered in this course.
-    """
-    import argparse
-    parser = argparse.ArgumentParser(description="Play Hog")
-    parser.add_argument('--run_experiments', '-r', action='store_true',
-                        help='Runs strategy experiments')
-
-    args = parser.parse_args()
-
-    if args.run_experiments:
-        run_experiments()
