@@ -159,7 +159,6 @@ def play(strategy0, strategy1, score0=0, score1=0, dice=six_sided,
             say = say(score0, score1)
             player = 1 - player
     else:
-
         prev0, prev1 = 0, 0
         while (score0 < goal and score1 < goal):
             if player:
@@ -218,6 +217,7 @@ def announce_lead_changes(previous_leader=None):
         elif score1 > score0:
             leader = 1
         else:
+            leader = None
             leader = None
             leader = None
         if leader != None and leader != previous_leader:
@@ -331,6 +331,14 @@ def make_averaged(fn, num_samples=1000):
     """
     # BEGIN PROBLEM 8
     "*** YOUR CODE HERE ***"
+    def averaged_fn(*args):
+        num, tot = num_samples, 0
+        while num > 0:
+            tot+=fn(*args)
+            num-=1
+        return tot / num_samples
+    return averaged_fn
+
     # END PROBLEM 8
 
 
@@ -345,6 +353,17 @@ def max_scoring_num_rolls(dice=six_sided, num_samples=1000):
     """
     # BEGIN PROBLEM 9
     "*** YOUR CODE HERE ***"
+    averaged_roll = make_averaged(roll_dice, num_samples)
+    i = 1
+    max_so_far = 0
+    cur_max = 1
+    while i <= 10:
+        average = averaged_roll(i, dice)
+        if average > max_so_far:
+            cur_max = i
+            max_so_far = average
+        i+=1
+    return cur_max
     # END PROBLEM 9
 
 
@@ -393,28 +412,21 @@ def bacon_strategy(score, opponent_score, margin=8, num_rolls=4):
     rolls NUM_ROLLS otherwise.
     """
     # BEGIN PROBLEM 10
-    return 4  # Replace this statement
-    # END PROBLEM 10
+    if free_bacon(opponent_score) >= margin:
+        return 0
+    else:
+        return num_rolls# Replace this statement
+# END PROBLEM 10
 
-
-def swap_strategy(score, opponent_score, margin=8, num_rolls=4):
-    """This strategy rolls 0 dice when it triggers a beneficial swap. It also
-    rolls 0 dice if it gives at least MARGIN points and does not trigger a
-    non-beneficial swap. Otherwise, it rolls NUM_ROLLS.
-    """
-    # BEGIN PROBLEM 11
-    return 4  # Replace this statement
-    # END PROBLEM 11
-
-
-def final_strategy(score, opponent_score):
-    """Write a brief description of your final strategy.
-
-    *** YOUR DESCRIPTION HERE ***
-    """
-    # BEGIN PROBLEM 12
-    return 4  # Replace this statement
-    # END PROBLEM 12
-
-##########################
-# Command Line Interface #
+def swap_strategy(score, opponent_score, margin = 8, num_rolls = 4):
+    #First check if rolling 0 triggers a beneficial swap
+    after_zero = score + free_bacon(opponent_score)
+    if is_swap(after_zero, opponent_score) and opponent_score > after_zero:
+        return 0
+    elif is_swap(after_zero, opponent_score) and opponent_score < after_zero:
+        return num_rolls
+    else:
+        if free_bacon(opponent_score) >= margin:
+            return 0
+        else:
+            return num_rolls
