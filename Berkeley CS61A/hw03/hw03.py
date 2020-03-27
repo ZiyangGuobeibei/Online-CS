@@ -181,6 +181,25 @@ def move_stack(n, start, end):
     """
     assert 1 <= start <= 3 and 1 <= end <= 3 and start != end, "Bad start/end"
     "*** YOUR CODE HERE ***"
+    if n == 1:
+        print_move(start, end)
+        return
+    elif n == 0:
+        return
+    other = 6 - start - end
+    #Use to and other to denote the node we want to move to in the current iteration and the node that we want to move next, respectively. 
+    if n % 2:
+        to = end
+    else:
+        to, other = other, end
+    cur = 0
+    #cur denotes how many things have been moved from origin
+    while cur <= n - 1:
+        print_move(start, to)
+        move_stack(cur, other, to)
+        to, other = other, to
+        cur+=1
+
 
 from operator import sub, mul
 
