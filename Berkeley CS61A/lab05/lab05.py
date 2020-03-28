@@ -15,6 +15,7 @@ def distance(city1, city2):
     5.0
     """
     "*** YOUR CODE HERE ***"
+    return sqrt((get_lat(city1) - get_lat(city2)) ** 2 + (get_lon(city1) - get_lon(city2)) ** 2)
 
 def closer_city(lat, lon, city1, city2):
     """
@@ -31,6 +32,11 @@ def closer_city(lat, lon, city1, city2):
     'Bucharest'
     """
     "*** YOUR CODE HERE ***"
+    this = make_city('', lat, lon)
+    if distance(city1, this) <= distance(city2, this):
+        return get_name(city1)
+    else:
+        return get_name(city2)
 
 def check_abstraction():
     """
@@ -130,6 +136,11 @@ def acorn_finder(t):
     True
     """
     "*** YOUR CODE HERE ***"
+    assert is_tree(t)
+    if is_leaf(t):
+        return True if label(t) == 'acorn' else False
+    else:
+        return label(t) == 'acorn' or any([acorn_finder(b) for b in branches(t)])
 
 def sprout_leaves(t, vals):
     """Sprout new leaves containing the data in vals at each leaf in
@@ -165,6 +176,11 @@ def sprout_leaves(t, vals):
           2
     """
     "*** YOUR CODE HERE ***"
+    assert is_tree(t)
+    if is_leaf(t):
+        return tree(label(t), branches = [tree(val) for val in vals])
+    else:
+        return tree(label(t), branches = [sprout_leaves(b, vals) for b in branches(t)])
 
 def add_chars(w1, w2):
     """
@@ -193,6 +209,13 @@ def add_chars(w1, w2):
     True
     """
     "*** YOUR CODE HERE ***"
+    if len(w1) == 0:
+        return w2
+    else:
+        if w1[0] == w2[0]:
+            return add_chars(w1[1:], w2[1:])
+        else:
+            return w2[0] + add_chars(w1, w2[1:])
 
 def add_trees(t1, t2):
     """
@@ -230,6 +253,30 @@ def add_trees(t1, t2):
       5
     """
     "*** YOUR CODE HERE ***"
+    if label(t1) == 'repl':
+        return create_tree(t2)
+
+    elif label(t2) == 'repl':
+        return create_tree(t1)
+
+    else:
+        if is_leaf(t1) and is_leaf(t2):
+            return tree(label(t1) + label(t2))
+        branches1 = branches(t1)
+        branches2 = branches(t2)
+        if len(branches1) > len(branches2):
+            branches2 += [tree('repl')] * (len(branches1) - len(branches2))
+        else:
+            branches1 += [tree('repl')] * (len(branches2) - len(branches1))
+        return tree(label(t1) + label(t2), branches = [add_trees(z1, z2) for z1, z2 in zip(branches1, branches2)])
+
+
+def create_tree(t):
+    assert is_tree(t)
+    if is_leaf(t):
+        return tree(label(t))
+    else:
+        return tree(label(t), branches = [create_tree(b) for b in branches(t)])
 
 # Shakespeare and Dictionaries
 def build_successors_table(tokens):
@@ -251,7 +298,9 @@ def build_successors_table(tokens):
     for word in tokens:
         if prev not in table:
             "*** YOUR CODE HERE ***"
+            table[prev] = []
         "*** YOUR CODE HERE ***"
+        table[prev] += [word]
         prev = word
     return table
 
@@ -269,6 +318,8 @@ def construct_sent(word, table):
     result = ''
     while word not in ['.', '!', '?']:
         "*** YOUR CODE HERE ***"
+        result += (word + ' ')
+        word = random.choice(table[word])
     return result.strip() + word
 
 def shakespeare_tokens(path='shakespeare.txt', url='http://composingprograms.com/shakespeare.txt'):
