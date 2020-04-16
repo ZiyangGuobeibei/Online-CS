@@ -176,14 +176,29 @@ def do_quote_form(rest, env):
     return rest.first
 
 def do_quasiquote_form(rest, env):
+    return do_quasiquote_form2(rest.first, env)
+    #if rest == nil or type(rest) is int or (type(rest) is str and scheme_reader.check_valid(rest)):
+     #   return rest
+    #elif isinstance(rest, Pair) and rest.first == 'unquote':
+     #   return scheme_eval(rest.rest, env)
+    #elif isinstance(rest, Pair):
+     #   return Pair(do_quasiquote_form(rest.first, env), do_quasiquote_form(rest.rest, env))
+    #else:
+     #   raise SchemeError
+
+def do_quasiquote_form2(rest, env):
+    if rest == nil or type(rest) is int or (type(rest) is str and check_valid(rest)):
+        return rest
+    elif isinstance(rest, Pair) and rest.first == 'unquote':
+        return scheme_eval(rest.rest.first, env)
+    elif isinstance(rest, Pair):
+        return Pair(do_quasiquote_form2(rest.first, env), do_quasiquote_form2(rest.rest, env))
+    else:
+        raise SchemeError
 
 
 def do_unquote_form(rest, env):
     raise SchemeError
-
-def nexted_unquote(rest, env):
-
-
 
 SPECIAL_FORMS = {
         'define': do_define_form,
