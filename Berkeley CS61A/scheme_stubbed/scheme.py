@@ -18,14 +18,32 @@ def scheme_eval(expr, env, _=None): # Optional third argument is ignored
     >>> scheme_eval(expr, create_global_frame())
     4
     """
-    return 'Your Code Here'
-
+    if type(expr) is int or type(expr) is float or expr == nil or type(expr) is bool:
+        return expr
+    elif type(expr) is str:
+        cur = env.look_up(expr)
+        if cur is None:
+            raise SchemeError
+        else:
+            return cur
+    elif isinstance(expr, Pair):
+        first, rest = expr.first, expr.rest
+        if scheme_symbolp(first) and first in SPECIAL_FORMS:
+            return SPECIAL_FORMS[first](rest, env)
+        else:
+            eval_first = scheme_eval(first, env)
+            if scheme_procedurep(eval_first):
+                return scheme_apply(eval_first, rest.map(lambda x:scheme_eval(x, env)), env)
+            else:
+                raise SchemeError
+    else:
+        return None
 
 def scheme_apply(procedure, args, env):
     """Apply Scheme PROCEDURE to argument values ARGS (a Scheme list) in
     environment ENV."""
-    return 'Your Code Here'
-
+    check_procedure(procedure)
+    return procedure.apply(args, env)
 
 
 ################
@@ -38,6 +56,8 @@ class Frame(object):
     def __init__(self, parent):
         """An empty frame with parent frame PARENT (which may be None)."""
         "Your Code Here"
+        self.parent = parent
+        self.bindings = {}
 
     def __repr__(self):
         if self.parent is None:
@@ -47,8 +67,17 @@ class Frame(object):
 
     def define(self, symbol, value):
         """Define Scheme SYMBOL to have VALUE."""
+        self.bindings[symbol] = value
 
-        return 'Your Code Here'
+    def look_up(self, symbol):
+        cur_frame = self
+        while(cur_frame is not None and symbol not in cur_frame.bindings):
+            cur_frame = cur_frame.parent
+
+        if cur_frame is None:
+            return None
+        else:
+            return cur_frame.bindings[symbol]
 
     # BEGIN PROBLEM 2/3
     "*** YOUR CODE HERE ***"
@@ -86,6 +115,19 @@ class BuiltinProcedure(Procedure):
         """
         # BEGIN PROBLEM 2
         "*** YOUR CODE HERE ***"
+        python_args = []
+        cur = args
+        while(cur != nil):
+            python_args.append(cur.first)
+            cur = cur.rest
+        if self.use_env:
+            python_args.append(env)
+
+        try:
+            return self.fn(*python_args)
+        except:
+            raise SchemeError
+        
         # END PROBLEM 2
 
 
@@ -107,7 +149,6 @@ class LambdaProcedure(Procedure):
         return 'LambdaProcedure({0}, {1}, {2})'.format(
             repr(self.formals), repr(self.body), repr(self.env))
 
-
 def add_builtins(frame, funcs_and_names):
     """Enter bindings in FUNCS_AND_NAMES into FRAME, an environment frame,
     as built-in procedures. Each item in FUNCS_AND_NAMES has the form
@@ -124,6 +165,31 @@ How you implement special forms is up to you. We recommend you encapsulate the
 logic for each special form separately somehow, which you can do here.
 """
 
+def do_define_form(rest, env):
+    if scheme_symbolp(rest.first):
+        env.define(rest.first, scheme_eval(rest.rest.first, env))
+        return rest.first
+    else:
+        raise SchemeError
+
+def do_quote_form(rest, env):
+    return rest.first
+
+def do_quasiquote_form(rest, env):
+
+
+def do_unquote_form(rest, env):
+    raise SchemeError
+
+def nexted_unquote(rest, env):
+
+
+
+SPECIAL_FORMS = {
+        'define': do_define_form,
+        'quote': do_quote_form,
+        'quasiquote': do_quasiquote_form,
+        'unquote': do_unquote_form,}
 
 # Utility methods for checking the structure of Scheme programs
 

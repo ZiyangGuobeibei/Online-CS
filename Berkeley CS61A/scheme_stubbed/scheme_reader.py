@@ -56,7 +56,6 @@ class Pair(object):
         if rest is not nil:
             s += ' . ' + repl_str(rest)
         return s + ')'
-
     def __len__(self):
         n, rest = 1, self.rest
         while isinstance(rest, Pair):
@@ -139,6 +138,10 @@ def scheme_read(src):
     else:
         if type(src.current()) is str and check_valid(src.current()):
             return src.pop_first().lower()
+        elif type(src.current()) is str and src.current() in quotes:
+            quote = quotes[src.current()]
+            src.pop_first()
+            return Pair(quote, Pair(scheme_read(src), nil))
         else:
              raise SyntaxError("unexpected tokens")
     # BEGIN PROBLEM 1/2
@@ -180,6 +183,10 @@ def read_tail(src):
             return Pair(False, read_tail(src))
         elif type(src.current()) is str and check_valid(src.current()):
             return Pair(src.pop_first().lower(), read_tail(src))
+        elif type(src.current()) is str and src.current() in quotes:
+            quote = quotes[src.current()]
+            src.pop_first()
+            return Pair(Pair(quote, Pair(scheme_read(src), nil)), read_tail(src))
         else:
             raise SyntaxError('unexpected tokens')
         # END PROBLEM 1
