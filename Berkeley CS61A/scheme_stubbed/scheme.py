@@ -152,13 +152,14 @@ class LambdaProcedure(Procedure):
 
     def apply(self, args, env):
         cur_param, cur_arg = self.formals, args
+        new_env = Frame(self.env)
         while(cur_param is not nil):
             if cur_arg is nil:
                 raise SchemeError
             else:
-                self.env.define(cur_param.first, cur_arg.first)
+                new_env.define(cur_param.first, cur_arg.first)
                 cur_param, cur_arg = cur_param.rest, cur_arg.rest
-        return do_begin_form(self.body, self.env)
+        return do_begin_form(self.body, new_env)
 
 def add_builtins(frame, funcs_and_names):
     """Enter bindings in FUNCS_AND_NAMES into FRAME, an environment frame,
@@ -311,6 +312,11 @@ def do_let_form(rest, env):
     return do_begin_form(rest.rest, new_env)
 
 def do_mu_form(rest, env):
+    if rest.rest is not nil:
+        return MuProcedure(rest.first, rest.rest)
+    else:
+        raise SchemeError
+
 
 SPECIAL_FORMS = {
         'define': do_define_form,
@@ -401,6 +407,17 @@ class MuProcedure(Procedure):
     def __repr__(self):
         return 'MuProcedure({0}, {1})'.format(
             repr(self.formals), repr(self.body))
+
+    def apply(self, args, env):
+        cur_param, cur_arg = self.formals, args
+        new_env = Frame(env)
+        while(cur_param is not nil):
+            if cur_arg is nil:
+                raise SchemeError
+            else:
+                new_env.define(cur_param.first, cur_arg.first)
+                cur_param, cur_arg = cur_param.rest, cur_arg.rest
+        return do_begin_form(self.body, new_env)
 
 
 ##################
