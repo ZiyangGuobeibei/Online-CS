@@ -175,10 +175,10 @@ def read_tail(src):
             return Pair(scheme_read(src), read_tail(src))
         elif type(src.current()) is int or type(src.current()) is float:
             return Pair(src.pop_first(), read_tail(src))
-        elif src.current() == '#t' or src.current() == 'true':
+        elif type(src.current()) is bool and src.current():
             src.pop_first()
             return Pair(True, read_tail(src))
-        elif src.current() == '#f' or src.current() == 'false':
+        elif type(src.current()) is bool and not src.current():
             src.pop_first()
             return Pair(False, read_tail(src))
         elif type(src.current()) is str and check_valid(src.current()):

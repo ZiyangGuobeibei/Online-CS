@@ -18,24 +18,26 @@ def scheme_eval(expr, env, _=None): # Optional third argument is ignored
     >>> scheme_eval(expr, create_global_frame())
     4
     """
-    if type(expr) is int or type(expr) is float or expr == nil or type(expr) is bool:
+    if expr == 'nil' or expr is nil:
+        return nil
+    elif type(expr) is int or type(expr) is float or type(expr) is bool:
         return expr
     elif type(expr) is str:
         cur = env.look_up(expr)
         if cur is None:
-            raise SchemeError
+            raise SchemeError("Could not find symbol in current environment!")
         else:
             return cur
     elif isinstance(expr, Pair):
         first, rest = expr.first, expr.rest
-        if scheme_symbolp(first) and first in SPECIAL_FORMS:
+        if scheme_symbolp(first) and (first in SPECIAL_FORMS):
             return SPECIAL_FORMS[first](rest, env)
         else:
             eval_first = scheme_eval(first, env)
             if scheme_procedurep(eval_first):
                 return scheme_apply(eval_first, rest.map(lambda x:scheme_eval(x, env)), env)
             else:
-                raise SchemeError
+                raise SchemeError("Cannot find symbol in current environment!")
     else:
         return None
 
@@ -118,7 +120,7 @@ class BuiltinProcedure(Procedure):
         python_args = []
         cur = args
         while(cur != nil):
-            python_args.append(cur.first)
+            python_args.append(cur.first)  
             cur = cur.rest
         if self.use_env:
             python_args.append(env)
@@ -126,10 +128,9 @@ class BuiltinProcedure(Procedure):
         try:
             return self.fn(*python_args)
         except:
-            raise SchemeError
+            raise SchemeError("The function is not well-defined")
         
         # END PROBLEM 2
-
 
 class LambdaProcedure(Procedure):
     """A procedure defined by a lambda expression or a define form."""
@@ -148,6 +149,16 @@ class LambdaProcedure(Procedure):
     def __repr__(self):
         return 'LambdaProcedure({0}, {1}, {2})'.format(
             repr(self.formals), repr(self.body), repr(self.env))
+
+    def apply(self, args, env):
+        cur_param, cur_arg = self.formals, args
+        while(cur_param is not nil):
+            if cur_arg is nil:
+                raise SchemeError
+            else:
+                self.env.define(cur_param.first, cur_arg.first)
+                cur_param, cur_arg = cur_param.rest, cur_arg.rest
+        return do_begin_form(self.body, self.env)
 
 def add_builtins(frame, funcs_and_names):
     """Enter bindings in FUNCS_AND_NAMES into FRAME, an environment frame,
@@ -170,7 +181,16 @@ def do_define_form(rest, env):
         env.define(rest.first, scheme_eval(rest.rest.first, env))
         return rest.first
     else:
-        raise SchemeError
+        if isinstance(rest.first, Pair) and scheme_symbolp(rest.first.first):
+            #Create a lambda procedure that contains list of formal parameters, the current environment, and a body of expressions. 
+            new_env = Frame(env)
+            if rest.rest is not nil:
+                env.define(rest.first.first, LambdaProcedure(rest.first.rest, rest.rest, new_env))
+                return rest.first.first
+            else:
+                raise SchemeError
+        else:
+            raise SchemeError
 
 def do_quote_form(rest, env):
     return rest.first
@@ -182,7 +202,7 @@ def do_quasiquote_form(rest, env):
     #elif isinstance(rest, Pair) and rest.first == 'unquote':
      #   return scheme_eval(rest.rest, env)
     #elif isinstance(rest, Pair):
-     #   return Pair(do_quasiquote_form(rest.first, env), do_quasiquote_form(rest.rest, env))
+     #   return Pair(do_quasiquote_for(let ((y (+ x 2)) (x (+ y 3))) (cons x (cons y nil)))m(rest.first, env), do_quasiquote_form(rest.rest, env))
     #else:
      #   raise SchemeError
 
@@ -200,11 +220,112 @@ def do_quasiquote_form2(rest, env):
 def do_unquote_form(rest, env):
     raise SchemeError
 
+def do_lambda_form(rest, env):
+    new_env = Frame(env)
+    if rest.rest is not nil:
+        return LambdaProcedure(rest.first, rest.rest, new_env)
+    else:
+        raise SchemeError
+
+def do_begin_form(rest, env):
+    if rest is nil:
+        return None
+    result_first, result_rest = scheme_eval(rest.first, env), do_begin_form(rest.rest, env)
+    return result_first if result_rest is None else result_rest 
+
+def do_if_form(rest, env):
+    cond = scheme_eval(rest.first, env)
+    if type(cond) is bool and (not cond):
+        return scheme_eval(rest.rest.rest.first, env)
+    else:
+        return scheme_eval(rest.rest.first, env)
+
+def do_and_form(rest, env):
+    cur = rest
+    if cur is nil:
+        return True
+
+    result = scheme_eval(rest.first, env)
+
+    while(cur.rest is not nil):
+        if type(result) is bool and (not result):
+            return False
+        else:
+            cur, result = cur.rest, scheme_eval(cur.rest.first, env)
+    return result
+
+def do_or_form(rest, env):
+    cur = rest
+    if cur is nil:
+        return False
+
+    result = scheme_eval(rest.first, env)
+
+    while(cur.rest is not nil):
+        if type(result) is bool and (not result):
+            cur, result = cur.rest, scheme_eval(cur.rest.first, env)
+        else:
+            return result
+
+    return result
+
+def do_cond_form(rest, env):
+    if rest is nil:
+        return None
+    cur_clause = rest
+    cur_cond = rest.first.first
+    while(cur_clause is not nil):
+        if cur_cond == 'else':
+            return do_begin_form(cur_clause.first.rest, env)
+        else:
+            pred = scheme_eval(cur_cond, env)
+            if type(pred) is bool and (not pred):
+                cur_clause = cur_clause.rest
+                if cur_clause is nil:
+                    break
+                cur_cond = cur_clause.first.first
+            else:
+                if cur_clause.first.rest is nil:
+                    return pred
+                else:
+                    return do_begin_form(cur_clause.first.rest, env)
+    return None
+
+def do_let_form(rest, env):
+    new_env = Frame(env)
+    cur = rest.first
+    while(cur is not nil):
+        try:
+            if(len(cur.first.rest) > 1 or len(cur.first.rest) <= 0):
+                raise SchemeError
+            else:
+                expr = scheme_eval(cur.first.rest.first, env)
+        except:
+            raise SchemeError("Error in bindings!")
+
+        if scheme_symbolp(cur.first.first):
+            new_env.define(cur.first.first, expr)
+        else:
+            raise SchemeError
+        cur = cur.rest
+    return do_begin_form(rest.rest, new_env)
+
+def do_mu_form(rest, env):
+
 SPECIAL_FORMS = {
         'define': do_define_form,
         'quote': do_quote_form,
         'quasiquote': do_quasiquote_form,
-        'unquote': do_unquote_form,}
+        'unquote': do_unquote_form,
+        'lambda': do_lambda_form,
+        'begin': do_begin_form,
+        'if': do_if_form,
+        'and': do_and_form,
+        'or': do_or_form,
+        'cond': do_cond_form,
+        'let': do_let_form,
+        'mu': do_mu_form,
+        }
 
 # Utility methods for checking the structure of Scheme programs
 
@@ -222,7 +343,6 @@ def check_form(expr, min, max=float('inf')):
         raise SchemeError('too few operands in form')
     elif length > max:
         raise SchemeError('too many operands in form')
-
 def check_formals(formals):
     """Check that FORMALS is a valid parameter list, a Scheme list of symbols
     in which each symbol is distinct. Raise a SchemeError if the list of
