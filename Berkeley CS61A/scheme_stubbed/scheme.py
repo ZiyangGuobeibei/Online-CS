@@ -9,7 +9,7 @@ from ucb import main, trace
 # Eval/Apply #
 ##############
 
-def scheme_eval(expr, env, _=None): # Optional third argument is ignored
+def scheme_eval(expr, env, tail = False): # Optional third argument is ignored
     """Evaluate Scheme expression EXPR in environment ENV.
 
     >>> expr = read_line('(+ 2 2)')
@@ -25,28 +25,44 @@ def scheme_eval(expr, env, _=None): # Optional third argument is ignored
     elif type(expr) is str:
         cur = env.look_up(expr)
         if cur is None:
-            raise SchemeError("Could not find symbol in current environment!")
+            raise SchemeError("Cannot find symbol in the current environment!")
         else:
             return cur
-    elif isinstance(expr, Pair):
-        first, rest = expr.first, expr.rest
-        if scheme_symbolp(first) and (first in SPECIAL_FORMS):
-            return SPECIAL_FORMS[first](rest, env)
-        else:
-            eval_first = scheme_eval(first, env)
-            if scheme_procedurep(eval_first):
-                return scheme_apply(eval_first, rest.map(lambda x:scheme_eval(x, env)), env)
-            else:
-                raise SchemeError("Cannot find symbol in current environment!")
-    else:
+    elif expr is None:
         return None
+
+    if tail:
+        return Thunk(expr, env)
+
+    result = Thunk(expr, env)
+    while isinstance(result, Thunk):
+        expr, env = result.expr, result.env
+        if isinstance(expr, Pair):
+            first, rest = expr.first, expr.rest
+            if type(first) is str and first in SPECIAL_FORMS:
+                result = SPECIAL_FORMS[first](rest, env)
+            else:
+                eval_first = scheme_eval(first, env)
+                if scheme_procedurep(eval_first):
+                    if isinstance(eval_first, MacroProcedure):
+                        result = eval_first.apply(rest, env)
+                    else:
+                        rest = rest.map(lambda x: scheme_eval(x, env))
+                        result = scheme_apply(eval_first, rest, env)
+                else:
+                    raise SchemeError("Invalid call expression {}".format(str(eval_first)))
+        else:
+            result = scheme_eval(expr, env)
+    return result
+
+def self_evaluating(expr):
+    return scheme_atomp(expr) or scheme_stringp(expr) or expr is None
 
 def scheme_apply(procedure, args, env):
     """Apply Scheme PROCEDURE to argument values ARGS (a Scheme list) in
     environment ENV."""
     check_procedure(procedure)
     return procedure.apply(args, env)
-
 
 ################
 # Environments #
@@ -184,9 +200,8 @@ def do_define_form(rest, env):
     else:
         if isinstance(rest.first, Pair) and scheme_symbolp(rest.first.first):
             #Create a lambda procedure that contains list of formal parameters, the current environment, and a body of expressions. 
-            new_env = Frame(env)
             if rest.rest is not nil:
-                env.define(rest.first.first, LambdaProcedure(rest.first.rest, rest.rest, new_env))
+                env.define(rest.first.first, LambdaProcedure(rest.first.rest, rest.rest, env))
                 return rest.first.first
             else:
                 raise SchemeError
@@ -219,7 +234,7 @@ def do_quasiquote_form2(rest, env):
 
 
 def do_unquote_form(rest, env):
-    raise SchemeError
+    raise SchemeError("Invalid unquote form.")
 
 def do_lambda_form(rest, env):
     new_env = Frame(env)
@@ -231,46 +246,59 @@ def do_lambda_form(rest, env):
 def do_begin_form(rest, env):
     if rest is nil:
         return None
-    result_first, result_rest = scheme_eval(rest.first, env), do_begin_form(rest.rest, env)
-    return result_first if result_rest is None else result_rest 
+
+    while rest is not nil:
+        if rest.rest is nil:
+            return scheme_eval(rest.first, env, tail = True)
+        else:
+            scheme_eval(rest.first, env)
+            rest = rest.rest
+
 
 def do_if_form(rest, env):
     cond = scheme_eval(rest.first, env)
     if type(cond) is bool and (not cond):
-        return scheme_eval(rest.rest.rest.first, env)
+        return scheme_eval(rest.rest.rest.first, env, tail = True)
     else:
-        return scheme_eval(rest.rest.first, env)
+        return scheme_eval(rest.rest.first, env, tail = True)
 
 def do_and_form(rest, env):
+    #Have to rewrite this function to support tail recursion in scheme
     cur = rest
     if cur is nil:
         return True
 
-    result = scheme_eval(rest.first, env)
-
-    while(cur.rest is not nil):
-        if type(result) is bool and (not result):
-            return False
+    while(cur is not nil):
+        expr = cur.first
+        if cur.rest is nil:
+            return scheme_eval(expr, env, tail = True)
         else:
-            cur, result = cur.rest, scheme_eval(cur.rest.first, env)
-    return result
+            this = scheme_eval(expr, env)
+            if type(this) is bool and (not this):
+                return False
+            else:
+                cur = cur.rest
 
 def do_or_form(rest, env):
+    #Have to rewrite this function to support tail recursion in scheme
     cur = rest
     if cur is nil:
         return False
 
-    result = scheme_eval(rest.first, env)
-
-    while(cur.rest is not nil):
-        if type(result) is bool and (not result):
-            cur, result = cur.rest, scheme_eval(cur.rest.first, env)
+    while(cur is not nil):
+        expr = cur.first
+        if cur.rest is nil:
+            return scheme_eval(expr, env, tail = True)
         else:
-            return result
+            this = scheme_eval(expr, env)
+            if not (type(this) is bool and (not this)):
+                return this
+            else:
+                cur = cur.rest
 
-    return result
 
 def do_cond_form(rest, env):
+    #Have to rewrite this function to support tail recursion in scheme
     if rest is nil:
         return None
     cur_clause = rest
@@ -317,6 +345,12 @@ def do_mu_form(rest, env):
     else:
         raise SchemeError
 
+def do_macro_form(rest, env):
+    if isinstance(rest.first, Pair) and rest.rest is not nil and scheme_symbolp(rest.first.first):
+        env.define(rest.first.first, MacroProcedure(rest.first.rest, rest.rest.first))
+    else:
+        raise SchemeError("Invalid call to define-macro.")
+    return rest.first.first
 
 SPECIAL_FORMS = {
         'define': do_define_form,
@@ -331,6 +365,7 @@ SPECIAL_FORMS = {
         'cond': do_cond_form,
         'let': do_let_form,
         'mu': do_mu_form,
+        'define-macro': do_macro_form,
         }
 
 # Utility methods for checking the structure of Scheme programs
@@ -431,10 +466,15 @@ def complete_apply(procedure, args, env):
     Right now it just calls scheme_apply, but you will need to change this
     if you attempt the extra credit."""
     val = scheme_apply(procedure, args, env) 
-    # Add stuff here?
+    while isinstance(val, Thunk):
+        expr, env = val.expr, val.env
+        val = scheme_eval(expr, env)
     return val
 
-
+class Thunk:
+    def __init__(self, expr, env):
+        self.expr = expr
+        self.env = env
 
 ####################
 # Extra Procedures #
@@ -470,8 +510,27 @@ def scheme_reduce(fn, s, env):
         s = s.rest
     return value
 
+class MacroProcedure(Procedure):
+    def __init__(self, formals, body):
+        self.formals = formals
+        self.body = body
+
+    def apply(self, args, env):
+        new_env = Frame(env)
+        cur_param = self.formals
+        cur_arg = args
+        while(cur_param is not nil):
+            if cur_arg is nil:
+                raise SchemeError("Unmatched number of arguments in macro procedure")
+            else:
+                firstp, firsta = cur_param.first, cur_arg.first
+                new_env.define(firstp, firsta)
+                cur_param, cur_arg = cur_param.rest, cur_arg.rest
+
+        body = scheme_eval(self.body, new_env)
+        return scheme_eval(body, env)
 ################
-# Input/Output #
+#iInput/Output #
 ################
 
 def read_eval_print_loop(next_line, env, interactive=False, quiet=False,

@@ -184,7 +184,14 @@ def scheme_numberp(x):
     return isinstance(x, numbers.Real) and not scheme_booleanp(x)
 
 @builtin("integer?")
-def scheme_integerp(x):
+def scheme_integerp(x):    elif expr.first == "define":
+        env.define(scheme_eval(expr.second.first), scheme_eval(expr.second.second))
+    elif expr.first == "quote":
+        pass
+    elif expr.first == 'quasiquote':
+        pass
+    elif expr.first == 'unquote':
+
     return scheme_numberp(x) and (isinstance(x, numbers.Integral) or int(x) == x)
 
 def _check_nums(*vals):
