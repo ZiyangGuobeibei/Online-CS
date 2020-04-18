@@ -1,6 +1,5 @@
 
-quine = """
-"*** YOUR CODE HERE ***"
+quine = """s = 'print("s = " + repr(s) + "; eval(s)")'; eval(s)
 """
 
 def quine_test():
