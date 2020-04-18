@@ -1,5 +1,5 @@
 (define-macro (switch expr cases)
-    'YOUR-CODE-HERE
+              (list 'eval (list 'car (list 'cdr (list 'car (list 'filter (list 'lambda (list 'not_allowed) (list 'equal? (list 'car 'not_allowed) expr)) (list 'quote cases))))))
 )
 
 (define (flatmap f x)
